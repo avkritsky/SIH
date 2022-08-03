@@ -1,11 +1,12 @@
 import asyncio
 from classes.db import DBManager
-from settings.config import default_path_to_db, columns_for_main_table, columns_for_transaction_table
+from settings.config import default_path_to_db
+from settings.tables_models import user_table
 
 
 async def create_table(db_name: str = 'user_data',
                        db_path: str = default_path_to_db,
-                       columns: dict = columns_for_main_table) -> bool:
+                       columns: dict = user_table) -> bool:
     """Function for create table with DB_NAME in DB_PATH with COLUMNS"""
     column_with_types = (f'{column} {column_type}' for column, column_type in columns.items())
 
