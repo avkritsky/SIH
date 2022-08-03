@@ -6,6 +6,7 @@ from settings.config import default_path_to_db, columns_for_main_table, columns_
 async def create_table(db_name: str = 'user_data',
                        db_path: str = default_path_to_db,
                        columns: dict = columns_for_main_table) -> bool:
+    """Function for create table with DB_NAME in DB_PATH with COLUMNS"""
     column_with_types = (f'{column} {column_type}' for column, column_type in columns.items())
 
     query = f"""CREATE TABLE IF NOT EXISTS {db_name}
@@ -20,8 +21,9 @@ async def create_table(db_name: str = 'user_data',
 
 
 async def add_data(db_name: str,
-                   data: dict):
-
+                   data: dict,
+                   db_path: str = default_path_to_db):
+    """Add data to DB_NAME"""
     column_names = ', '.join(data.keys())
     values_placeholder = ', '.join('?' * len(data))
     values = tuple(data.values())
@@ -33,7 +35,7 @@ async def add_data(db_name: str,
                 )
     """
 
-    res = await DBManager().execute(query, values)
+    res = await DBManager(path=db_path).execute(query, values)
     if res:
         print(f'Successful added data to DB {db_name}!')
     return res
@@ -42,7 +44,8 @@ async def add_data(db_name: str,
 async def get_data(db_name: str,
                    criterias: dict = None,
                    order_by: str = None,
-                   desc: bool = False) -> list:
+                   desc: bool = False,
+                   db_path: str = default_path_to_db) -> list:
     criterias = criterias or {}
 
     query = f"""SELECT *
@@ -56,7 +59,7 @@ async def get_data(db_name: str,
     if order_by:
         query += f' ORDER BY {order_by}' + ('', ' DESC')[desc]
 
-    db = DBManager()
+    db = DBManager(path=db_path)
     res = await db.select(query, tuple(criterias.values()))
     if res:
         print(f'Successful select data from db {db_name}!')
@@ -66,7 +69,8 @@ async def get_data(db_name: str,
 
 async def update_data(db_name: str,
                       data: dict,
-                      criterias: dict = None):
+                      criterias: dict = None,
+                      db_path: str = default_path_to_db):
 
     criterias = criterias or {}
 
@@ -83,7 +87,7 @@ async def update_data(db_name: str,
         query += f' WHERE {" AND ".join(placeholders)}'
         data_holder += list(criterias.values())
 
-    res = await DBManager().execute(query, tuple(data_holder))
+    res = await DBManager(path=db_path).execute(query, tuple(data_holder))
 
     if res:
         print('Успешное обновление данных!')
@@ -99,5 +103,5 @@ if __name__ == '__main__':
     #                        'received_currency': 'USDT',
     #                        'received_count': 130000,}))
     asyncio.run(update_data(db_name='user_transaction',
-                            data={'spended_count': 777},
+                            data={'spended_count': 888},
                             criterias={'user_id': 'a17e16'}))

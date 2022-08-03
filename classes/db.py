@@ -33,7 +33,7 @@ class DBManager:
                 await db.execute(sql=query, parameters=params)
                 await db.commit()
         except Exception as e:
-            print(f'Error: DB-INSERT: {e}\nWith query: {query}')
+            print(f'Error: DB-EXECUTE: {e}\nWith query: {query}')
             return False
         else:
             return True
