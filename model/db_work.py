@@ -64,6 +64,33 @@ async def get_data(db_name: str,
     return db.last_result
 
 
+async def update_data(db_name: str,
+                      data: dict,
+                      criterias: dict = None):
+
+    criterias = criterias or {}
+
+    data_lines = [f'{header} = ?' for header, value in data.items()]
+
+    query = f"""UPDATE {db_name}
+                SET {", ".join(data_lines)}
+            """
+
+    data_holder = list(data.values())
+
+    if criterias:
+        placeholders = (f'{column} = ?' for column in criterias)
+        query += f' WHERE {" AND ".join(placeholders)}'
+        data_holder += list(criterias.values())
+
+    res = await DBManager().execute(query, tuple(data_holder))
+
+    if res:
+        print('Успешное обновление данных!')
+
+    return res
+
+
 if __name__ == '__main__':
     # asyncio.run(add_data(db_name='user_transaction', data={'user_id': 'a17e16',
     #                        'operation_type': 'BUY',
@@ -71,4 +98,6 @@ if __name__ == '__main__':
     #                        'spended_count': 6,
     #                        'received_currency': 'USDT',
     #                        'received_count': 130000,}))
-    asyncio.run(get_data(db_name='user_transaction'))
+    asyncio.run(update_data(db_name='user_transaction',
+                            data={'spended_count': 777},
+                            criterias={'user_id': 'a17e16'}))
