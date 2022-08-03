@@ -44,15 +44,19 @@ async def add_transaction(user_id: str,
                           received_currency: str,
                           received_count: int):
     """Add transaction to user_transaction"""
+    data = {
+        'user_id': user_id,
+        'operation_type': operation_type,
+        'spended_currency': spended_currency,
+        'spended_count': spended_count,
+        'received_currency': received_currency,
+        'received_count': received_count,
+    }
+
     res = await add_data(db_name='user_transaction',
-                         data={
-                             'user_id': user_id,
-                             'operation_type': operation_type,
-                             'spended_currency': spended_currency,
-                             'spended_count': spended_count,
-                             'received_currency': received_currency,
-                             'received_count': received_count,
-                         })
+                         data=data)
+
+    await update_user_total_info(user_id, data)
 
     if res:
         print(f'Успешно добавлена транзакция пользователя {user_id}!')
@@ -66,7 +70,32 @@ async def show_user_transaction(user_id: str, selected_page: int = 1):
     return res
 
 
+async def update_user_total_info(user_id: str, transaction: dict = None):
+    """Update user total cash after transaction"""
+    user_data = await get_data(db_name='user_data',
+                               criterias={'user_id': user_id})
+
+    if not user_data:
+        return False
+
+    try:
+        default_val, raw_total = user_data[0][-2:]
+        print(default_val, raw_total)
+        total = json.loads(
+            raw_total
+        )
+    except Exception as e:
+        print(f'Ошибка получения общей информации пользователя {user_id}: {e=}')
+
+
+
+async def recalculation_user_total_info():
+    """Take all user transactions from USER_TRANSACTION table and calculate total user cash"""
+    ...
+
+
+
 if __name__ == '__main__':
     ...
     # asyncio.run(create_tables())
-    asyncio.run(show_user_transaction(user_id='a17e16'))
+    asyncio.run(update_user_total_info(user_id='1'))
