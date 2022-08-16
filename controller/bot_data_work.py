@@ -1,12 +1,14 @@
 import asyncio
 import json
+from decimal import Decimal
+from datetime import datetime
 
 # DB
 from model.db_work import create_table, add_data, get_data, update_data
 # SETTINGS
 from settings.tables_models import created_tables_on_start
 # Dataclasses
-from model.transaction_data_class import Transaction, TransactionType
+from model.transaction_data_class import Transaction
 
 
 async def create_tables() -> bool:
@@ -39,91 +41,78 @@ async def add_user(user_id: str,
         print(f'Успешно создан пользователь {user_name} с ID: {user_id}!')
     return res
 
-async def add_transaction(user_id: str,
-                          operation_type: str,
-                          spended_currency: str,
-                          spended_count: int,
-                          received_currency: str,
-                          received_count: int):
+async def add_transaction(transaction: Transaction):
     """Add transaction to user_transaction"""
-    try:
-        transaction = Transaction(
-            user_id=user_id,
-            operation_type=(TransactionType.BUY, TransactionType.SEND)[operation_type == TransactionType.SEND.value],
-            spended_currency=spended_currency,
-            spended_count=spended_count,
-            received_currency=received_currency,
-            received_count=received_count,
-        )
-    except Exception as e:
-        print(f'Ошибка при формировании transaction: {e=}')
-        return False
 
     res = await add_data(db_name='user_transaction',
                          data={
-        'user_id': user_id,
-        'operation_type': operation_type,
-        'spended_currency': spended_currency,
-        'spended_count': spended_count,
-        'received_currency': received_currency,
-        'received_count': received_count,
+        'user_id': transaction.user_id,
+        'timestamp': int(datetime.timestamp(datetime.now())),
+        'spended_currency': transaction.spended_currency,
+        'spended_count': transaction.spended_count,
+        'received_currency': transaction.received_currency,
+        'received_count': transaction.received_count,
     })
 
-    await update_user_total_info(user_id, transaction)
+    await update_user_total_info(transaction)
 
     if res:
-        print(f'Успешно добавлена транзакция пользователя {user_id}!')
+        print(f'Успешно добавлена транзакция пользователя {transaction.user_id}!')
     return res
 
 
-async def show_user_transaction(user_id: str, selected_page: int = 1):
+async def get_user_transaction(user_id: str, selected_page: int = 1):
     res = await get_data(db_name='user_transaction',
                          criterias={'user_id': user_id})
     # TODO: добавить разбивку на чанки по 10 транзакций и выдавать SELECTED_PAGE-транзакцию -1
     return res
 
 
-async def update_user_total_info(user_id: str, transaction_data: Transaction):
+async def update_user_total_info(transaction_data: Transaction):
     """Update user total cash after transaction"""
+
+    total = await get_user_total(transaction_data.user_id)
+
+    await update_data(db_name='user_data',
+                      data={
+                          'total': json.dumps(total),
+                      },
+                      criterias={
+                           'user_id': transaction_data.user_id,
+                      })
+
+
+async def get_user_total(user_id: str) -> dict:
+    """Return dict with users total data or empty dict on error"""
     user_data = await get_data(db_name='user_data',
                                criterias={'user_id': user_id})
 
     if not user_data:
-        return False
+        return {}
 
     try:
-        default_val, raw_total = user_data[0][-2:]
-        print(default_val, raw_total)
+        raw_total = user_data[0][-1]
+        return json.loads(raw_total)
     except IndexError as e:
         print(f'Ошибка получения общей информации пользователя {user_id}: {e=}')
-        return False
-
-    try:
-        total = json.loads(
-            raw_total
-        )
-
-        add_transaction_data_to_total(total, transaction_data)
-    except Exception as e:
-        print(f'Ошибка обновления данных TOTAL у {user_id=}: {e=}')
-        return False
-
-    await update_data(db_name='user_data',
-                      data={
-                          'total': total,
-                      },
-                      criterias={
-                           'user_id': user_id,
-                      })
+        return {}
+    except json.JSONDecodeError as e:
+        print(f'Ошибка при загрузке данных из JSON: {e=}')
+        return {}
 
 
 def add_transaction_data_to_total(user_total: dict, transaction_data: Transaction):
+    """Add new values to user's total data. Save data in str, operation with Decimal"""
 
-    user_total.setdefault(transaction_data.received_currency, 0)
-    user_total[transaction_data.received_currency] += transaction_data.received_count
+    user_total[transaction_data.received_currency] = str(
+            Decimal(user_total.get(transaction_data.received_currency, '0')) +
+            Decimal(transaction_data.received_count)
+    )
 
-    user_total.setdefault(transaction_data.spended_currency, 0)
-    user_total[transaction_data.spended_currency] -= transaction_data.spended_count
+    user_total[transaction_data.spended_currency] = str(
+            Decimal(user_total.get(transaction_data.spended_currency, '0')) -
+            Decimal(transaction_data.spended_count)
+    )
 
 
 async def recalculation_user_total_info():
@@ -134,5 +123,11 @@ async def recalculation_user_total_info():
 
 if __name__ == '__main__':
     ...
+    # asyncio.run(create_tables())
+    print(asyncio.run(get_user_total(user_id='1')))
+    # asyncio.run(add_transaction(Transaction()
+    #                             .set_user_id('1')
+    #                             .set_spended_currency('RUB').set_spended_count('100')
+    #                             .set_received_currency('ETH').set_received_count('0.054')))
     # asyncio.run(create_tables())
     # asyncio.run(update_user_total_info(user_id='1'))

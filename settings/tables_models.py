@@ -6,17 +6,17 @@ user_table = {
     'total': 'TEXT',
 }
 
-transaction_table = {
+user_transaction = {
     'id': 'INTEGER PRIMARY KEY AUTOINCREMENT',
     'user_id': 'TEXT NOT NULL',
-    'operation_type': 'TEXT',
+    'timestamp': 'INTEGER',
     'spended_currency': 'TEXT',
-    'spended_count': 'INTEGER',
+    'spended_count': 'TEXT',
     'received_currency': 'TEXT',
-    'received_count': 'INTEGER',
+    'received_count': 'TEXT',
 }
 
 created_tables_on_start = {
     'user_data': user_table,
-    'transaction_data': transaction_table,
+    'user_transaction': user_transaction,
 }
