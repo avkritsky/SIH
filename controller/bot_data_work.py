@@ -2,6 +2,7 @@ import asyncio
 import json
 from decimal import Decimal
 from datetime import datetime
+from typing import Union
 
 # DB
 from model.db_work import create_table, add_data, get_data, update_data
@@ -9,6 +10,7 @@ from model.db_work import create_table, add_data, get_data, update_data
 from settings.tables_models import created_tables_on_start
 # Dataclasses
 from model.transaction_data_class import Transaction
+from model.user_data_class import UserData
 
 
 async def create_tables() -> bool:
@@ -92,13 +94,27 @@ async def get_user_total(user_id: str) -> dict:
 
     try:
         raw_total = user_data[0][-1]
-        return json.loads(raw_total)
+        total = json.loads(raw_total)
+        return total if isinstance(total, dict) else {}
     except IndexError as e:
         print(f'Ошибка получения общей информации пользователя {user_id}: {e=}')
         return {}
     except json.JSONDecodeError as e:
         print(f'Ошибка при загрузке данных из JSON: {e=}')
         return {}
+
+
+async def get_user_data(user_id: str) -> Union[bool, UserData]:
+    """Return users data from DB as an instance of a class UserData"""
+    raw_user_data = await get_data(db_name='user_data',
+                               criterias={'user_id': user_id})
+
+    if not raw_user_data:
+        return False
+
+    user_data = UserData().from_raw_data(raw_user_data[0])
+
+    return user_data
 
 
 def add_transaction_data_to_total(user_total: dict, transaction_data: Transaction):
