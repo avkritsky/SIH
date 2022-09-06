@@ -43,22 +43,24 @@ async def set_data_to_redis(data: Dict[str, dict], ttl: timedelta = None) -> boo
     async with RedisConnection() as redis:
         res = []
         for key, val in data.items():
+            print(f'Записываю ключ {key} где {val=}')
             res.append(
                 await redis.set(
                     key,
-                    value=json.dumps(data, default=str),
+                    value=json.dumps(val, default=str),
                     ex=ttl,
                 )
             )
         return all(res)
 
 
-
 async def get_from_redis(key: str) -> dict:
     """Get data by KEY and return dict or empty dict if error or None result"""
     async with RedisConnection() as redis:
         data = await redis.get(key)
-        return data if data is not None else {}
+        if isinstance(data, str):
+            data = json.loads(data)
+        return {} if data is None else data
 
 
 async def get_all_keys(mask: str = '*') -> list:

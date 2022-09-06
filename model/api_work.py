@@ -11,7 +11,7 @@ async def execute_get_request(url: str, parameters: dict = None, headers: dict =
     async with ClientSession(headers=headers) as sess:
         async with sess.get(url=url, params=parameters) as request:
             status = request.status
-            data = await request.json()
+            data = await request.json(content_type=None)
     return status, data
 
 

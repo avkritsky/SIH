@@ -4,18 +4,18 @@
 import asyncio
 from datetime import timedelta
 
-from model.redis_work import set_data_to_redis, get_all_keys
-from controller.bot_api_prices_work import get_new_crypto_prices_from_api
+from model.redis_work import set_data_to_redis, get_all_keys, get_from_redis
+from controller.bot_api_prices_work import get_new_crypto_prices_from_api, get_new_valute_prices_from_api
 
 from settings.config import TTL_FOR_VALUES_IN_SEC
 
 
-async def update_crypto_prices_and_save_to_redis():
+async def update_crypto_prices_and_save_to_redis() -> set:
     """Get new crypto prices and save it in redis"""
     raw_prices = await get_new_crypto_prices_from_api()
 
     if not raw_prices:
-        return False
+        return set()
 
     prices = format_raw_prices_data(raw_prices)
 
@@ -23,9 +23,40 @@ async def update_crypto_prices_and_save_to_redis():
 
     if save_data_in_redis_res:
         print('Успешно обновлены цены крипто валют!')
-    print(save_data_in_redis_res)
+        currency_names = await get_all_keys()
+        return set(currency_names)
 
-    print(await get_all_keys())
+    return set()
+
+
+async def update_valute_prices_and_save_to_redis() -> set:
+    prices = await get_new_valute_prices_from_api()
+
+    if not prices:
+        return set()
+
+    save_data_in_redis_res = await set_data_to_redis(prices, ttl=timedelta(seconds=TTL_FOR_VALUES_IN_SEC))
+
+    if save_data_in_redis_res:
+        print('Успешно обновлены цены валют!')
+
+    return set()
+
+
+async def get_price(value_name: str = 'BTC') -> dict:
+    """Get values price from redis by values name. Return dict with keys: fullname, price, last_update"""
+    data = await get_from_redis(value_name)
+
+    if not data:
+        await update_valute_prices_and_save_to_redis()
+        value_names = await update_crypto_prices_and_save_to_redis()
+        print(value_names)
+        if value_name not in value_names:
+            print(f'В списке валют нету запрашиваемой: {value_name}!')
+            return {}
+        return await get_price(value_name)
+
+    return data
 
 
 
@@ -54,4 +85,5 @@ def format_raw_prices_data(raw_data: dict) -> dict:
 
 
 if __name__ == '__main__':
-    asyncio.run(update_crypto_prices_and_save_to_redis())
+    data = asyncio.run(get_price('USD'))
+    print(type(data))
