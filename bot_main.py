@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import Message
@@ -10,9 +10,9 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 from settings.api_key import APP_TOKEN
 
-from controller.bot_data_work import get_user_total, add_user, get_user_data
+from controller.bot_data_work import get_user_total, add_user, get_user_data, update_user_total_info
 from model.user_data_class import UserData
-from controller.bot_redis_work import get_price
+from controller.bot_redis_work import get_price, redis_get_currency_short_names, redis_get_crypto_short_names
 
 
 # TODO:
@@ -39,7 +39,7 @@ async def send_welcome(mess: Message):
     else:
         await add_user(user_id=str(mess.from_user.id),
                        user_name=mess.from_user.full_name)
-        await mess.answer(text=f'Hello, {mess.from_user.full_name}'
+        await mess.answer(text=f'Hello, {mess.from_user.full_name.title()}'
                                f'\nI am Sihe ^^'
                                f'\nI can help you with your investing!',
                           reply_markup=get_start_menu())
@@ -50,11 +50,12 @@ async def show_user_statistic(mess: Message):
     user_data: UserData = await get_user_data(str(mess.from_user.id))
 
     if not user_data.total:
-        await mess.answer(text='Excuse me, You have not any valutes!')
+        await mess.answer(text='Excuse me, You have not any currency!')
+        return
 
     user_stats_parts = []
 
-    spended = Decimal(user_data.total.get(user_data.default_value, 0)) * -1
+    spended = Decimal(user_data.total.get(user_data.default_value, 0))
     getted = Decimal(0)
 
     for valute_name, valute_val in user_data.total.items():
@@ -95,10 +96,10 @@ class AddMenuAutomat(StatesGroup):
     waiting_fot_received_currency = State()
     waiting_fot_received_currency_value = State()
 
+# {"BTC": "0.03444", "RUB": "70700", "ETH": "0.3916"}
 
-# @dp.callback_query_handler(text='Add')
 def register_handlers_for_add_menu(dp: Dispatcher):
-    dp.register_message_handler(start_automat_for_add, commands='Add', state='*')
+    dp.register_message_handler(start_automat_for_add, Text(equals=['Add']), state='*')
     dp.register_message_handler(automat_for_add_spended_currency, state=AddMenuAutomat.waiting_fot_spended_currency)
     dp.register_message_handler(automat_for_add_spended_value, state=AddMenuAutomat.waiting_fot_spended_currency_value)
     dp.register_message_handler(automat_for_add_received_currency, state=AddMenuAutomat.waiting_fot_received_currency)
@@ -107,7 +108,15 @@ def register_handlers_for_add_menu(dp: Dispatcher):
 
 async def start_automat_for_add(mess: Message, state: FSMContext):
     await state.set_state(AddMenuAutomat.waiting_fot_spended_currency.state)
-    await mess.answer('Введите название затраченной валюты (аббревиатуру):')
+
+    user_data: UserData = await get_user_data(mess.from_user.id)
+
+    await state.set_data({'user_data': user_data})
+
+    spended_currency = await redis_get_currency_short_names()
+
+    await mess.answer('Введите название затраченной валюты (аббревиатуру):',
+                      reply_markup=create_keyboard(spended_currency))
 
 
 async def automat_for_add_spended_currency(mess: Message, state: FSMContext):
@@ -122,23 +131,36 @@ async def automat_for_add_spended_currency(mess: Message, state: FSMContext):
     # можно показать клаву
 
     await state.set_state(AddMenuAutomat.waiting_fot_spended_currency_value.state)
-    await mess.answer('Теперь введите количество затраченной валюты')
+    await mess.answer('Теперь введите количество затраченной валюты',
+                      reply_markup=types.ReplyKeyboardRemove())
 
 
 async def automat_for_add_spended_value(mess: Message, state: FSMContext):
-    if not mess.text.isdecimal():
+    if not check_for_decimal(mess.text):
         await mess.answer('Введите число или дробное число!')
         return
 
     print('Сумма принята')
     await state.update_data(spended_currency_val=mess.text)
+    crypto_currency = await redis_get_crypto_short_names()
 
     await state.set_state(AddMenuAutomat.waiting_fot_received_currency.state)
-    await mess.answer('Введите валюту которую вы приобрели!')
+    await mess.answer('Введите валюту которую вы приобрели!',
+                      reply_markup=create_keyboard(crypto_currency))
+
+
+def check_for_decimal(checked_txt: str) -> bool:
+    try:
+        Decimal(checked_txt.replace(',', '.'))
+        return True
+    except InvalidOperation:
+        return False
 
 
 async def automat_for_add_received_currency(mess: Message, state: FSMContext):
-    if mess.text.upper() not in ['BTC', 'ETH']:
+    crypto_currency = ('BTC', 'ETH')
+
+    if mess.text.upper() not in crypto_currency:
         await mess.answer('Пока доступны только битки и эфир для покупок, введите BTC или ETH!')
         return
 
@@ -146,11 +168,12 @@ async def automat_for_add_received_currency(mess: Message, state: FSMContext):
     await state.update_data(received_currency=mess.text)
 
     await state.set_state(AddMenuAutomat.waiting_fot_received_currency_value.state)
-    await mess.answer('Введите введите количество приобретенной валюты!')
+    await mess.answer('Введите введите количество приобретенной валюты!',
+                      reply_markup=types.ReplyKeyboardRemove())
 
 
 async def automat_for_add_received_value(mess: Message, state: FSMContext):
-    if not mess.text.isdecimal():
+    if not check_for_decimal(mess.text):
         await mess.answer('Введите число или дробное число!')
         return
 
@@ -160,7 +183,23 @@ async def automat_for_add_received_value(mess: Message, state: FSMContext):
     spended_cur_val = automat_data.get('spended_currency_val')
     received_cur = automat_data.get('received_currency')
 
-    await mess.answer(f'Вы фиктивно приобрели {mess.text} {received_cur} за жалкие {spended_cur_val} {spended_cur}!')
+    user_data: UserData = automat_data.get('user_data')
+
+    user_total_for_spend = user_data.total.setdefault(spended_cur, '0')
+    user_total_for_recei = user_data.total.setdefault(received_cur, '0')
+
+    user_total_for_spend = Decimal(user_total_for_spend) + Decimal(spended_cur_val)
+    user_total_for_recei = Decimal(user_total_for_recei) + Decimal(mess.text)
+
+    user_data.total[spended_cur] = str(user_total_for_spend)
+    user_data.total[received_cur] = str(user_total_for_recei)
+
+    await update_user_total_info(mess.from_user.id, user_data.total)
+
+    await mess.answer(f'Вы фиктивно приобрели {mess.text} {received_cur} за жалкие {spended_cur_val} {spended_cur}!'
+                      f'\nТеперь у Вас всего {user_total_for_recei} {received_cur}'
+                      f'\nВсего потрачено: {user_total_for_spend} {spended_cur}',
+                      reply_markup=get_start_menu())
     await state.finish()
 
 

@@ -2,6 +2,7 @@
 # функция обновления цен в редисе
 # функция сохранения списка имеющихся валют ['BTC', 'USD', 'ETH', ... ]
 import asyncio
+import json
 from datetime import timedelta
 
 from model.redis_work import set_data_to_redis, get_all_keys, get_from_redis
@@ -18,6 +19,9 @@ async def update_crypto_prices_and_save_to_redis() -> set:
         return set()
 
     prices = format_raw_prices_data(raw_prices)
+    crypto_short_names = list(prices.keys())
+
+    await set_data_to_redis({'crypto': crypto_short_names}, db=2)
 
     save_data_in_redis_res = await set_data_to_redis(prices, ttl=timedelta(seconds=TTL_FOR_VALUES_IN_SEC))
 
@@ -35,6 +39,9 @@ async def update_valute_prices_and_save_to_redis() -> set:
     if not prices:
         return set()
 
+    currency_short_names = list(prices.keys())
+
+    await set_data_to_redis({'currency': currency_short_names}, db=2)
     save_data_in_redis_res = await set_data_to_redis(prices, ttl=timedelta(seconds=TTL_FOR_VALUES_IN_SEC))
 
     if save_data_in_redis_res:
@@ -43,11 +50,41 @@ async def update_valute_prices_and_save_to_redis() -> set:
     return set()
 
 
+async def redis_get_currency_short_names() -> list:
+    names: list = await get_from_redis('currency', db=2)
+
+    if not names:
+        return ['RUB', 'USD', 'EUR']
+
+    try:
+        names.remove('EUR')
+    except ValueError:
+        pass
+
+    try:
+        names.remove('USD')
+    except ValueError:
+        pass
+
+    names = ['RUB', 'USD', 'EUR'] + names
+
+    return names if names else []
+
+
+async def redis_get_crypto_short_names() -> tuple:
+    names = await get_from_redis('crypto', db=2)
+    return names if names else tuple()
+
+
+
 async def get_price(value_name: str = 'BTC') -> dict:
     """Get values price from redis by values name. Return dict with keys: fullname, price, last_update"""
-    data = await get_from_redis(value_name)
 
+    print('Пытаюсь получить валюту')
+    data = await get_from_redis(value_name)
+    print('ПОлучил валюту')
     if not data:
+        print('Начинаю получать валюты по API')
         await update_valute_prices_and_save_to_redis()
         value_names = await update_crypto_prices_and_save_to_redis()
         print(value_names)

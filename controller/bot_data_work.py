@@ -56,7 +56,7 @@ async def add_transaction(transaction: Transaction):
         'received_count': transaction.received_count,
     })
 
-    await update_user_total_info(transaction)
+    # await update_user_total_info(transaction)
 
     if res:
         print(f'Успешно добавлена транзакция пользователя {transaction.user_id}!')
@@ -70,17 +70,17 @@ async def get_user_transaction(user_id: str, selected_page: int = 1):
     return res
 
 
-async def update_user_total_info(transaction_data: Transaction):
+async def update_user_total_info(user_id: str, new_total: dict):
     """Update user total cash after transaction"""
 
-    total = await get_user_total(transaction_data.user_id)
+    # total = await get_user_total(user_id)
 
     await update_data(db_name='user_data',
                       data={
-                          'total': json.dumps(total),
+                          'total': json.dumps(new_total),
                       },
                       criterias={
-                           'user_id': transaction_data.user_id,
+                           'user_id': user_id,
                       })
 
 

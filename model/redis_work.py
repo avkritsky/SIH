@@ -38,9 +38,9 @@ class RedisConnection:
             self.connection = None
 
 
-async def set_data_to_redis(data: Dict[str, dict], ttl: timedelta = None) -> bool:
+async def set_data_to_redis(data: dict, ttl: timedelta = None, db: int = 1) -> bool:
     """Set data in redis by key, return success (True/False)"""
-    async with RedisConnection() as redis:
+    async with RedisConnection(db=db) as redis:
         res = []
         for key, val in data.items():
             print(f'Записываю ключ {key} где {val=}')
@@ -54,9 +54,9 @@ async def set_data_to_redis(data: Dict[str, dict], ttl: timedelta = None) -> boo
         return all(res)
 
 
-async def get_from_redis(key: str) -> dict:
+async def get_from_redis(key: str, db: int = 1):
     """Get data by KEY and return dict or empty dict if error or None result"""
-    async with RedisConnection() as redis:
+    async with RedisConnection(db=db) as redis:
         data = await redis.get(key)
         if isinstance(data, str):
             data = json.loads(data)
