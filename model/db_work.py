@@ -68,6 +68,25 @@ async def get_data(db_name: str,
     return db.last_result
 
 
+async def del_data(db_name: str,
+                   criterias: dict = None,
+                   db_path: str = default_path_to_db):
+    criterias = criterias or {}
+
+    query = f"""DELETE FROM {db_name} """
+
+    if criterias:
+        placeholders = (f'{column} = ?' for column in criterias)
+        query += f' WHERE {" AND ".join(placeholders)}'
+
+    db = DBManager(path=db_path)
+    res = await db.execute(query, tuple(criterias.values()))
+    if res:
+        print(f'Successful deleted data from db {db_name}!')
+        return True
+    return False
+
+
 async def update_data(db_name: str,
                       data: dict,
                       criterias: dict = None,

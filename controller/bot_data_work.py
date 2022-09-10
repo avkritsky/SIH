@@ -3,9 +3,10 @@ import json
 from decimal import Decimal
 from datetime import datetime
 from typing import Union
+from datetime import datetime
 
 # DB
-from model.db_work import create_table, add_data, get_data, update_data
+from model.db_work import create_table, add_data, get_data, update_data, del_data
 # SETTINGS
 from settings.tables_models import created_tables_on_start
 # Dataclasses
@@ -70,6 +71,13 @@ async def get_user_transaction(user_id: str, selected_page: int = 1):
     return res
 
 
+async def del_user_transaction(user_id: str, trans_id: int):
+    res = await del_data(db_name='user_transaction',
+                         criterias={'user_id': user_id,
+                                    'id': trans_id})
+    return res
+
+
 async def update_user_total_info(user_id: str, new_total: dict):
     """Update user total cash after transaction"""
 
@@ -117,33 +125,22 @@ async def get_user_data(user_id: str) -> Union[bool, UserData]:
     return user_data
 
 
-def add_transaction_data_to_total(user_total: dict, transaction_data: Transaction):
-    """Add new values to user's total data. Save data in str, operation with Decimal"""
+async def add_user_stat(user_id: str, summ_val: str, summ_prc: str):
+    res = await add_data(db_name='user_stats',
+                         data={
+        'user_id': user_id,
+        'timestamp': int(datetime.timestamp(datetime.now())),
+        'summary_profit': summ_val,
+        'summary_profit_perc': summ_prc,
+    })
 
-    user_total[transaction_data.received_currency] = str(
-            Decimal(user_total.get(transaction_data.received_currency, '0')) +
-            Decimal(transaction_data.received_count)
-    )
+    if res:
+        print(f'Успешно добавлена статистика пользователя {user_id}!')
 
-    user_total[transaction_data.spended_currency] = str(
-            Decimal(user_total.get(transaction_data.spended_currency, '0')) -
-            Decimal(transaction_data.spended_count)
-    )
-
-
-async def recalculation_user_total_info():
-    """Take all user transactions from USER_TRANSACTION table and calculate total user cash"""
-    ...
+    return res
 
 
 
 if __name__ == '__main__':
     ...
-    # asyncio.run(create_tables())
-    print(asyncio.run(get_user_total(user_id='1')))
-    # asyncio.run(add_transaction(Transaction()
-    #                             .set_user_id('1')
-    #                             .set_spended_currency('RUB').set_spended_count('100')
-    #                             .set_received_currency('ETH').set_received_count('0.054')))
-    # asyncio.run(create_tables())
-    # asyncio.run(update_user_total_info(user_id='1'))
+    print(int(datetime.timestamp(datetime.now().replace(hour=0, minute=0, second=0))))

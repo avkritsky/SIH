@@ -18,8 +18,10 @@ def get_start_menu():
     return keyboard
 
 
-def create_keyboard(menu_titles: Union[tuple, list]):
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+def create_keyboard(menu_titles: Union[tuple, list], row_size: int = 3):
+    print(f'{menu_titles=}')
+
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=row_size)
     keyboard.add(*menu_titles)
 
     return keyboard

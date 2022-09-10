@@ -1,27 +1,27 @@
 import asyncio
-from decimal import Decimal, InvalidOperation
-from typing import Union
 
-from aiogram import Bot, Dispatcher, executor, types
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 
 from settings.api_key import APP_TOKEN
 
-from controller.bot_data_work import get_user_total, add_user, get_user_data, update_user_total_info
+from controller.bot_data_work import get_user_total, add_user, get_user_data, create_tables
 from model.user_data_class import UserData
-from controller.bot_redis_work import get_price, redis_get_currency_short_names, redis_get_crypto_short_names
 
 from view.common.keyboard import get_start_menu
 from view.main_menu.add import register_handlers_for_add_menu
+from view.main_menu.del_transaction import register_handlers_for_del_menu
 from view.main_menu.statistics import create_user_stats
 
 
 async def start_bot():
+
+    await create_tables()
+
     bot = Bot(token=APP_TOKEN)
     dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -29,7 +29,10 @@ async def start_bot():
     dp.register_message_handler(show_user_statistic, Text(equals=['Statistics', 'stat', 'стат']))
     dp.register_message_handler(cmd_cancel, Text(equals=['Cancel', 'cancel', 'cl', 'Отмена', 'отмена']), state='*')
 
+    # ADD menu button
     register_handlers_for_add_menu(dp)
+    # DEL menu button
+    register_handlers_for_del_menu(dp)
 
     await dp.skip_updates()
     print('Bot running...')
@@ -37,6 +40,7 @@ async def start_bot():
 
 
 async def send_welcome(mess: Message):
+    """Show hello message!"""
     print(f'Пользователь {mess.from_user.id} начал общение с ботом!')
     print(f'{mess.location=}')
     user_data: UserData = await get_user_data(str(mess.from_user.id))
@@ -53,12 +57,15 @@ async def send_welcome(mess: Message):
 
 
 async def show_user_statistic(mess: Message):
+    """Show user stats. Main Menu button."""
     user_stats_parts = await create_user_stats(mess)
-    await mess.answer(text='\n'.join(user_stats_parts),
-                      reply_markup=get_start_menu())
+    if user_stats_parts:
+        await mess.answer(text='\n'.join(user_stats_parts),
+                          reply_markup=get_start_menu())
 
 
 async def cmd_cancel(message: types.Message, state: FSMContext):
+    """Canceled FSM automat and show Main Menu"""
     await state.finish()
     await message.answer("Действие отменено", reply_markup=get_start_menu())
 

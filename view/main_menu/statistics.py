@@ -1,22 +1,11 @@
-from decimal import Decimal, InvalidOperation
-from typing import Union
+from decimal import Decimal
+from datetime import datetime, timedelta
 
-from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import Message
-from aiogram.dispatcher.filters import Text
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
-
-from settings.api_key import APP_TOKEN
-
-from controller.bot_data_work import get_user_total, add_user, get_user_data, update_user_total_info
+from controller.bot_data_work import get_user_data, add_user_stat
 from model.user_data_class import UserData
-from controller.bot_redis_work import get_price, redis_get_currency_short_names, redis_get_crypto_short_names
-
-from view.common.keyboard import get_start_menu
-from view.main_menu.add import register_handlers_for_add_menu
+from controller.bot_redis_work import get_price, get_all_keys, set_data_to_redis
 
 
 async def create_user_stats(mess: Message):
@@ -25,16 +14,19 @@ async def create_user_stats(mess: Message):
 
     if not user_data.total:
         await mess.answer(text='Excuse me, You have not any currency!')
-        return
+        return False
 
     user_stats_parts = []
 
-    spended = Decimal(user_data.total.get(user_data.default_value, 0))
-    getted = Decimal(0)
+    all_spended = Decimal(0)
+    all_getted = Decimal(0)
 
     for valute_name, valute_val in user_data.total.items():
-        if valute_name == user_data.default_value:
+        if ':' in valute_name:
             continue
+
+        getted = Decimal(0)
+
         valute_price_data = await get_price(valute_name.upper())
         raw_usd_price = await get_price('USD')
         usd_price = raw_usd_price.get('Value')
@@ -48,6 +40,7 @@ async def create_user_stats(mess: Message):
         usd_val = (Decimal(str(valute_val)) * Decimal(str(valute_price))).quantize(Decimal("1.00"))
         user_val = (usd_val * Decimal(str(usd_price))).quantize(Decimal('1.00'))
         getted += user_val
+        all_getted += getted
 
         user_stats_parts.append(
             f'{valute_name.upper()}:'
@@ -55,8 +48,40 @@ async def create_user_stats(mess: Message):
             f'| {usd_val} $'
             f'| {user_val} {user_data.default_value}'
         )
-    user_stats_parts.append(
-        f'Profit: {getted - spended} or {(((getted - spended) / spended) * 100).quantize(Decimal("1.00"))} %'
-    )
+
+        spended = user_data.total.get(f'{user_data.default_value}:{valute_name}')
+
+        if spended is None:
+            continue
+
+        spended = Decimal(spended)
+        all_spended += spended
+
+        user_stats_parts.append(
+            f'=== Profit: {getted - spended} {user_data.default_value} '
+            f'or {(((getted - spended) / spended) * 100).quantize(Decimal("1.00"))} %\n'
+        )
+
+    all_sum = all_getted - all_spended
+    all_prc = (((all_getted - all_spended) / all_spended) * 100).quantize(Decimal("1.00"))
+    user_stats_parts.append(f'Summary profit: {all_sum} {user_data.default_value} or {all_prc} %')
+
+    await add_data_to_user_stats(str(mess.from_user.id),
+                                 summ_val=str(all_sum),
+                                 summ_prc=str(all_prc))
 
     return user_stats_parts
+
+
+async def add_data_to_user_stats(user_id: str, summ_val: str, summ_prc: str):
+    today = int(datetime.timestamp(datetime.now().replace(hour=0, minute=0, second=0)))
+    today_key = f'{today}:{user_id}'
+
+    checked_user_data = await get_all_keys(mask=today_key)
+
+    if checked_user_data:
+        return
+
+    await set_data_to_redis(data={today_key: ''}, ttl=timedelta(days=2))
+    await add_user_stat(user_id, summ_val, summ_prc)
+

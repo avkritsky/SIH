@@ -16,7 +16,16 @@ user_transaction = {
     'received_count': 'TEXT',
 }
 
+user_stats = {
+    'id': 'INTEGER PRIMARY KEY AUTOINCREMENT',
+    'user_id': 'TEXT NOT NULL',
+    'timestamp': 'INTEGER',
+    'summary_profit': 'TEXT',
+    'summary_profit_perc': 'TEXT',
+}
+
 created_tables_on_start = {
     'user_data': user_table,
     'user_transaction': user_transaction,
+    'user_stats': user_stats,
 }

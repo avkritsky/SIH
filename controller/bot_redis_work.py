@@ -80,9 +80,9 @@ async def redis_get_crypto_short_names() -> tuple:
 async def get_price(value_name: str = 'BTC') -> dict:
     """Get values price from redis by values name. Return dict with keys: fullname, price, last_update"""
 
-    print('Пытаюсь получить валюту')
+    print(f'Пытаюсь получить валюту {value_name}')
     data = await get_from_redis(value_name)
-    print('ПОлучил валюту')
+    print(f'ПОлучил валюту {value_name}')
     if not data:
         print('Начинаю получать валюты по API')
         await update_valute_prices_and_save_to_redis()

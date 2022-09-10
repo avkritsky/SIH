@@ -63,9 +63,9 @@ async def get_from_redis(key: str, db: int = 1):
         return {} if data is None else data
 
 
-async def get_all_keys(mask: str = '*') -> list:
+async def get_all_keys(mask: str = '*', db: int = 1) -> list:
     """Get all keys from redis by MASK and return list of keys"""
-    async with RedisConnection() as redis:
+    async with RedisConnection(db=db) as redis:
         res = await redis.keys(pattern=mask)
         return res
 

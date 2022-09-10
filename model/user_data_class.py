@@ -21,7 +21,4 @@ class UserData:
 
 
 if __name__ == '__main__':
-    a = (1, '369107121', 'ANATOLY', 'RUB', '{"BTC": "0.0012", "RUB": "-200", "ETH": "0.054"}')
-    foo = UserData().from_raw_data(a)
-
-    print(foo.users_cash)
+    ...
