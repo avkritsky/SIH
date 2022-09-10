@@ -58,11 +58,11 @@ async def create_user_stats(mess: Message):
         all_spended += spended
 
         user_stats_parts.append(
-            f'=== Profit: {getted - spended} {user_data.default_value} '
+            f'=== Profit: {(getted - spended).quantize(Decimal("1.00"))} {user_data.default_value} '
             f'or {(((getted - spended) / spended) * 100).quantize(Decimal("1.00"))} %\n'
         )
 
-    all_sum = all_getted - all_spended
+    all_sum = (all_getted - all_spended).quantize(Decimal("1.00"))
     all_prc = (((all_getted - all_spended) / all_spended) * 100).quantize(Decimal("1.00"))
     user_stats_parts.append(f'Summary profit: {all_sum} {user_data.default_value} or {all_prc} %')
 
