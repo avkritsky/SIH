@@ -1,16 +1,14 @@
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
-from aiogram import Dispatcher, types
+from aiogram import Dispatcher
 from aiogram.types import Message
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
 from controller.bot_data_work import get_user_data, update_user_total_info, del_user_transaction, get_user_transaction
-from controller.bot_redis_work import redis_get_currency_short_names, redis_get_crypto_short_names
 from model.user_data_class import UserData
-from model.transaction_data_class import Transaction
 from view.common.keyboard import create_keyboard, get_start_menu
 
 
@@ -18,15 +16,10 @@ from view.common.keyboard import create_keyboard, get_start_menu
 class DelMenuAutomat(StatesGroup):
     show_users_transactions = State()
     del_selected_transaction = State()
-    # waiting_fot_received_currency = State()
-    # waiting_fot_received_currency_value = State()
 
 def register_handlers_for_del_menu(dp: Dispatcher):
     dp.register_message_handler(start_automat_for_del, Text(equals=['Del']), state='*')
     dp.register_message_handler(automat_for_del_transaction, state=DelMenuAutomat.del_selected_transaction)
-    # dp.register_message_handler(automat_for_add_spended_value, state=DelMenuAutomat.waiting_fot_spended_currency_value)
-    # dp.register_message_handler(automat_for_add_received_currency, state=DelMenuAutomat.waiting_fot_received_currency)
-    # dp.register_message_handler(automat_for_add_received_value, state=DelMenuAutomat.waiting_fot_received_currency_value)
 
 
 async def start_automat_for_del(mess: Message, state: FSMContext):
@@ -34,6 +27,13 @@ async def start_automat_for_del(mess: Message, state: FSMContext):
 
     user_data: UserData = await get_user_data(mess.from_user.id)
     user_transactions = await get_user_transaction(str(mess.from_user.id))
+
+    if not user_transactions:
+        await mess.answer(f'You have not any transactions!',
+                          reply_markup=get_start_menu())
+        await state.finish()
+        return
+
 
     user_transactions = {
         (f'{datetime.fromtimestamp(transaction[2])}: {transaction[4]} {transaction[3]} '

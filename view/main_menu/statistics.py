@@ -2,6 +2,9 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 
 from aiogram.types import Message
+from aiogram.types.input_file import InputFile
+import numpy as np
+import matplotlib.pyplot as plt
 
 from controller.bot_data_work import get_user_data, add_user_stat
 from model.user_data_class import UserData
@@ -17,6 +20,7 @@ async def create_user_stats(mess: Message):
         return False
 
     user_stats_parts = []
+    user_data_for_plt = {}
 
     all_spended = Decimal(0)
     all_getted = Decimal(0)
@@ -62,15 +66,72 @@ async def create_user_stats(mess: Message):
             f'or {(((getted - spended) / spended) * 100).quantize(Decimal("1.00"))} %\n'
         )
 
+        # для постройки графиков
+        user_data_for_plt[f'{valute_name}:S'] = spended
+        user_data_for_plt[f'{valute_name}:R'] = getted
+
+    user_data_for_plt['SUM:S'] = all_spended
+    user_data_for_plt['SUM:R'] = all_getted
+
     all_sum = (all_getted - all_spended).quantize(Decimal("1.00"))
     all_prc = (((all_getted - all_spended) / all_spended) * 100).quantize(Decimal("1.00"))
     user_stats_parts.append(f'Summary profit: {all_sum} {user_data.default_value} or {all_prc} %')
+
+    await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
+
 
     await add_data_to_user_stats(str(mess.from_user.id),
                                  summ_val=str(all_sum),
                                  summ_prc=str(all_prc))
 
     return user_stats_parts
+
+
+async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB'):
+    for k, v in user_data_plt.items():
+        print(k, v)
+
+    colors = []
+    for i, value in enumerate(user_data_plt.values()):
+        if (i+1) % 2 == 0:
+            if value - summary >= 0:
+                colors.append('green')
+            else:
+                colors.append('red')
+        else:
+            colors.append('blue')
+            summary = value
+
+    y_pos = np.arange(len(user_data_plt))
+
+    plt.bar(y_pos, list(user_data_plt.values()), align='center', alpha=0.5, color=colors)
+    plt.xticks(y_pos, tuple(user_data_plt.keys()), rotation=45)
+    plt.ylabel(user_default_cur)
+    plt.title('Spend and received value')
+
+    for i, value in enumerate(user_data_plt.values()):
+        if i % 2 == 0:
+            plt.text(x=i-0.4, y=int(value), s=int(value), size=12)
+            summary = int(value)
+        else:
+            summary = int(value) - summary
+            if summary >= 0:
+                text = f'{int(value)}\n+{summary}'
+                color = 'green'
+            else:
+                text = f'{int(value)}\n{summary}'
+                color = 'red'
+            plt.text(x=i-0.4, y=int(value), s=text, size=11, color=color)
+
+    name_plot_file = f'data/tmp_plot/{mess.from_user.id}_{int(datetime.timestamp(datetime.now()))}.png'
+    print(f'{name_plot_file=}')
+    plt.savefig(name_plot_file)
+
+    photo = InputFile(name_plot_file)
+    photo_response = await mess.bot.send_photo(mess.chat.id, photo)
+    # Узнать как залить в другой чат, получить id и засунуть в скрытую ссылку.
+    # добавить удаление после загрузки!!!
+
 
 
 async def add_data_to_user_stats(user_id: str, summ_val: str, summ_prc: str):

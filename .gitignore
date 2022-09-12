@@ -1,3 +1,4 @@
 *.pyc
 *.db
 api_key.py
+data/tmp_plot/
