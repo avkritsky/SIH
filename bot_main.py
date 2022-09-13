@@ -42,7 +42,7 @@ async def start_bot():
 async def send_welcome(mess: Message):
     """Show hello message!"""
     print(f'Пользователь {mess.from_user.id} начал общение с ботом!')
-    print(f'{mess.location=}')
+    print(f'{mess.chat.id=}')
     user_data: UserData = await get_user_data(str(mess.from_user.id))
     if user_data:
         await mess.answer(f'Hello, {mess.from_user.full_name}\nYour cash:\n{user_data.users_cash}',
@@ -58,10 +58,7 @@ async def send_welcome(mess: Message):
 
 async def show_user_statistic(mess: Message):
     """Show user stats. Main Menu button."""
-    user_stats_parts = await create_user_stats(mess)
-    if user_stats_parts:
-        await mess.answer(text='\n'.join(user_stats_parts),
-                          reply_markup=get_start_menu())
+    await create_user_stats(mess)
 
 
 async def cmd_cancel(message: types.Message, state: FSMContext):

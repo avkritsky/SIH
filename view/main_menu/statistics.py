@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import datetime, timedelta
+from os import remove
 
 from aiogram.types import Message
 from aiogram.types.input_file import InputFile
@@ -9,6 +10,8 @@ import matplotlib.pyplot as plt
 from controller.bot_data_work import get_user_data, add_user_stat
 from model.user_data_class import UserData
 from controller.bot_redis_work import get_price, get_all_keys, set_data_to_redis
+from settings.api_key import TEMP_PLOT_CHAT
+from view.common.keyboard import get_start_menu
 
 
 async def create_user_stats(mess: Message):
@@ -25,6 +28,47 @@ async def create_user_stats(mess: Message):
     all_spended = Decimal(0)
     all_getted = Decimal(0)
 
+    await calculate_stats(user_data, all_getted, all_spended, user_stats_parts, user_data_for_plt)
+    await add_summary_data_to_stats(user_data, all_getted, all_spended, user_stats_parts, user_data_for_plt)
+
+    plot_id = await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
+
+    if plot_id:
+        await mess.bot.send_photo(mess.from_user.id,
+                                  photo=plot_id,
+                                  caption='\n'.join(user_stats_parts),
+                                  reply_markup=get_start_menu())
+    else:
+        await mess.answer(text='\n'.join(user_stats_parts),
+                          reply_markup=get_start_menu())
+
+
+async def add_summary_data_to_stats(user_data: UserData,
+                          all_getted: Decimal,
+                          all_spended: Decimal,
+                          user_stats_parts: list,
+                          user_data_for_plt: dict):
+    user_data_for_plt['SUM:S'] = all_spended
+    user_data_for_plt['SUM:R'] = all_getted
+
+    all_sum, all_prc, emoji = calculate_profit_and_generate_emoji(all_spended, all_getted)
+    user_stats_parts.append(f'{emoji} Summary profit: {all_sum} {user_data.default_value} or {all_prc} %')
+
+    await add_new_statistics_to_user_stats_db(user_data, all_sum, all_prc)
+
+
+async def add_new_statistics_to_user_stats_db(user_data: UserData, all_sum: Decimal, all_prc: Decimal):
+    await add_data_to_user_stats(user_data.user_id, summ_val=str(all_sum), summ_prc=str(all_prc))
+
+
+async def calculate_stats(user_data: UserData,
+                          all_getted: Decimal,
+                          all_spended: Decimal,
+                          user_stats_parts: list,
+                          user_data_for_plt: dict):
+
+    usd_price = await get_usd_price()
+
     for valute_name, valute_val in user_data.total.items():
         if ':' in valute_name:
             continue
@@ -32,10 +76,10 @@ async def create_user_stats(mess: Message):
         getted = Decimal(0)
 
         valute_price_data = await get_price(valute_name.upper())
-        raw_usd_price = await get_price('USD')
-        usd_price = raw_usd_price.get('Value')
+
         if not valute_price_data:
             continue
+
         valute_price = valute_price_data.get('price', 0)
 
         if not valute_price:
@@ -53,54 +97,71 @@ async def create_user_stats(mess: Message):
             f'| {user_val} {user_data.default_value}'
         )
 
-        spended = user_data.total.get(f'{user_data.default_value}:{valute_name}')
-
-        if spended is None:
-            continue
-
-        spended = Decimal(spended)
+        spended = calculate_spend_value(user_data, valute_name)
         all_spended += spended
 
+        profit, profit_perc, emoji = calculate_profit_and_generate_emoji(spended, getted)
+
         user_stats_parts.append(
-            f'=== Profit: {(getted - spended).quantize(Decimal("1.00"))} {user_data.default_value} '
-            f'or {(((getted - spended) / spended) * 100).quantize(Decimal("1.00"))} %\n'
+            f'{emoji} Profit: {profit} {user_data.default_value} or {profit_perc} %\n'
         )
 
         # для постройки графиков
         user_data_for_plt[f'{valute_name}:S'] = spended
         user_data_for_plt[f'{valute_name}:R'] = getted
 
-    user_data_for_plt['SUM:S'] = all_spended
-    user_data_for_plt['SUM:R'] = all_getted
 
-    all_sum = (all_getted - all_spended).quantize(Decimal("1.00"))
-    all_prc = (((all_getted - all_spended) / all_spended) * 100).quantize(Decimal("1.00"))
-    user_stats_parts.append(f'Summary profit: {all_sum} {user_data.default_value} or {all_prc} %')
+def calculate_spend_value(user_data: UserData, valute_name: str) -> Decimal:
+    spended = user_data.total.get(f'{user_data.default_value}:{valute_name}')
 
-    await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
+    if spended is None:
+        return Decimal(0)
 
-
-    await add_data_to_user_stats(str(mess.from_user.id),
-                                 summ_val=str(all_sum),
-                                 summ_prc=str(all_prc))
-
-    return user_stats_parts
+    return Decimal(spended)
 
 
-async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB'):
-    for k, v in user_data_plt.items():
-        print(k, v)
+async def get_usd_price() -> str:
+    raw_usd_price = await get_price('USD')
+    return raw_usd_price.get('Value')
 
-    colors = []
-    for i, value in enumerate(user_data_plt.values()):
-        if (i+1) % 2 == 0:
-            if value - summary >= 0:
-                colors.append('green')
-            else:
-                colors.append('red')
-        else:
-            colors.append('blue')
-            summary = value
+
+def calculate_profit_and_generate_emoji(spended: Decimal, getted: Decimal) -> tuple:
+    all_sum = (getted - spended).quantize(Decimal("1.00"))
+    all_prc = (((getted - spended) / spended) * 100).quantize(Decimal("1.00"))
+    emoji = b"\xE2\x8F\xAB".decode('utf-8') if all_sum >= 0 else b"\xE2\x8F\xAC".decode('utf-8')
+
+    return all_sum, all_prc, emoji
+
+
+
+async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB') -> str:
+
+    plot_file_name = generate_plot(user_data_plt, user_default_cur, mess.from_user.id)
+
+    plot_file_id = await upload_user_plot_to_default_chat_for_file_id(mess, plot_file_name)
+
+    return plot_file_id
+
+
+async def upload_user_plot_to_default_chat_for_file_id(mess: Message, plot_file_name: str) -> str:
+    """Try upload user's plot to default chat and get file_id, else send plot to user and return empty str"""
+    plot = InputFile(plot_file_name)
+    try:
+        plot_response = await mess.bot.send_photo(TEMP_PLOT_CHAT, plot)
+        user_stats_plot_id = plot_response.photo[-1]['file_id']
+        remove(plot_file_name)
+    except Exception as e:
+        await mess.bot.send_message(TEMP_PLOT_CHAT, f'Error at generating user stats plot: {e=}. {mess.from_user.id}')
+        await mess.bot.send_photo(mess.chat.id, plot)
+        return ''
+    else:
+        return user_stats_plot_id
+
+
+def generate_plot(user_data_plt: dict, user_default_cur: str, user_id: int) -> str:
+    """Generate plot for user stats and return plots file name"""
+
+    colors: list = generate_colors_for_stats(user_data_plt)
 
     y_pos = np.arange(len(user_data_plt))
 
@@ -109,6 +170,37 @@ async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_d
     plt.ylabel(user_default_cur)
     plt.title('Spend and received value')
 
+    add_descriptions_for_plot_bars(plt, user_data_plt)
+
+    name_plot_file = generate_plot_name(user_id)
+    plt.savefig(name_plot_file)
+
+    return name_plot_file
+
+
+def generate_plot_name(user_id: int):
+    return f'data/tmp_plot/{user_id}_{int(datetime.timestamp(datetime.now()))}.png'
+
+
+def generate_colors_for_stats(user_data_plt: dict) -> list:
+    """Generate colors for stats bars"""
+    colors = []
+    summary = 0
+    for i, value in enumerate(user_data_plt.values()):
+        if i % 2 == 0:
+            colors.append('blue')
+            summary = value
+        else:
+            if value - summary >= 0:
+                colors.append('green')
+            else:
+                colors.append('red')
+    return colors
+
+
+def add_descriptions_for_plot_bars(plt, user_data_plt: dict):
+    """Add descriptions for bars with color differences"""
+    summary = 0
     for i, value in enumerate(user_data_plt.values()):
         if i % 2 == 0:
             plt.text(x=i-0.4, y=int(value), s=int(value), size=12)
@@ -123,26 +215,23 @@ async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_d
                 color = 'red'
             plt.text(x=i-0.4, y=int(value), s=text, size=11, color=color)
 
-    name_plot_file = f'data/tmp_plot/{mess.from_user.id}_{int(datetime.timestamp(datetime.now()))}.png'
-    print(f'{name_plot_file=}')
-    plt.savefig(name_plot_file)
-
-    photo = InputFile(name_plot_file)
-    photo_response = await mess.bot.send_photo(mess.chat.id, photo)
-    # Узнать как залить в другой чат, получить id и засунуть в скрытую ссылку.
-    # добавить удаление после загрузки!!!
-
-
 
 async def add_data_to_user_stats(user_id: str, summ_val: str, summ_prc: str):
+    """Add user stats in DB USER_STATS"""
+    if not await checked_user_stat_already_added(user_id):
+        return
+    await add_user_stat(user_id, summ_val, summ_prc)
+
+
+async def checked_user_stat_already_added(user_id: str) -> bool:
+    """Checked that user stats already added in DB, if not, add data to redis"""
     today = int(datetime.timestamp(datetime.now().replace(hour=0, minute=0, second=0)))
     today_key = f'{today}:{user_id}'
 
     checked_user_data = await get_all_keys(mask=today_key)
 
     if checked_user_data:
-        return
+        return False
 
     await set_data_to_redis(data={today_key: ''}, ttl=timedelta(days=2))
-    await add_user_stat(user_id, summ_val, summ_prc)
-
+    return True
