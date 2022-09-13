@@ -161,8 +161,6 @@ async def upload_user_plot_to_default_chat_for_file_id(mess: Message, plot_file_
 def generate_plot(user_data_plt: dict, user_default_cur: str, user_id: int) -> str:
     """Generate plot for user stats and return plots file name"""
 
-    print(user_data_plt)
-
     plt.cla()
     plt.clf()
 
