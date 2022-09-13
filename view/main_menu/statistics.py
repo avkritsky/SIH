@@ -25,10 +25,7 @@ async def create_user_stats(mess: Message):
     user_stats_parts = []
     user_data_for_plt = {}
 
-    all_spended = Decimal(0)
-    all_getted = Decimal(0)
-
-    await calculate_stats(user_data, all_getted, all_spended, user_stats_parts, user_data_for_plt)
+    all_getted, all_spended = await calculate_stats(user_data, user_stats_parts, user_data_for_plt)
     await add_summary_data_to_stats(user_data, all_getted, all_spended, user_stats_parts, user_data_for_plt)
 
     plot_id = await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
@@ -62,12 +59,13 @@ async def add_new_statistics_to_user_stats_db(user_data: UserData, all_sum: Deci
 
 
 async def calculate_stats(user_data: UserData,
-                          all_getted: Decimal,
-                          all_spended: Decimal,
                           user_stats_parts: list,
-                          user_data_for_plt: dict):
+                          user_data_for_plt: dict) -> tuple:
 
     usd_price = await get_usd_price()
+
+    all_spended = Decimal(0)
+    all_getted = Decimal(0)
 
     for valute_name, valute_val in user_data.total.items():
         if ':' in valute_name:
@@ -109,6 +107,8 @@ async def calculate_stats(user_data: UserData,
         # для постройки графиков
         user_data_for_plt[f'{valute_name}:S'] = spended
         user_data_for_plt[f'{valute_name}:R'] = getted
+
+    return all_getted, all_spended
 
 
 def calculate_spend_value(user_data: UserData, valute_name: str) -> Decimal:
@@ -160,6 +160,11 @@ async def upload_user_plot_to_default_chat_for_file_id(mess: Message, plot_file_
 
 def generate_plot(user_data_plt: dict, user_default_cur: str, user_id: int) -> str:
     """Generate plot for user stats and return plots file name"""
+
+    print(user_data_plt)
+
+    plt.cla()
+    plt.clf()
 
     colors: list = generate_colors_for_stats(user_data_plt)
 
