@@ -7,7 +7,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
-from controller.bot_data_work import get_user_data, update_user_total_info, del_user_transaction, get_user_transaction
+from controller.bot_data_work import db_get_user_data, db_update_user_total_info, db_del_user_transaction, db_get_user_transaction
 from model.user_data_class import UserData
 from view.common.keyboard import create_keyboard, get_start_menu
 
@@ -25,8 +25,8 @@ def register_handlers_for_del_menu(dp: Dispatcher):
 async def start_automat_for_del(mess: Message, state: FSMContext):
     await state.set_state(DelMenuAutomat.del_selected_transaction.state)
 
-    user_data: UserData = await get_user_data(mess.from_user.id)
-    user_transactions = await get_user_transaction(str(mess.from_user.id))
+    user_data: UserData = await db_get_user_data(mess.from_user.id)
+    user_transactions = await db_get_user_transaction(str(mess.from_user.id))
 
     if not user_transactions:
         await mess.answer(f'You have not any transactions!',
@@ -73,8 +73,8 @@ async def automat_for_del_transaction(mess: Message, state: FSMContext):
     user_data.total[key_for_spended] = str(Decimal(user_data.total.get(key_for_spended)) - Decimal(trans_scv))
     user_data.total[trans_rc] = str(Decimal(user_data.total.get(trans_rc)) - Decimal(trans_rcv))
 
-    await update_user_total_info(mess.from_user.id, user_data.total)
-    del_res = await del_user_transaction(mess.from_user.id, trans_id)
+    await db_update_user_total_info(mess.from_user.id, user_data.total)
+    del_res = await db_del_user_transaction(mess.from_user.id, trans_id)
 
     await mess.answer(f'Транзакция {("неуспешно","успешно",)[del_res]} была удалена!',
                       reply_markup=get_start_menu())

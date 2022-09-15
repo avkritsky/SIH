@@ -7,7 +7,7 @@ from aiogram.types.input_file import InputFile
 import numpy as np
 import matplotlib.pyplot as plt
 
-from controller.bot_data_work import get_user_data, add_user_stat
+from controller.bot_data_work import db_get_user_data, db_add_user_statistics
 from model.user_data_class import UserData
 from controller.bot_redis_work import get_price, get_all_keys, set_data_to_redis
 from settings.api_key import TEMP_PLOT_CHAT
@@ -16,7 +16,7 @@ from view.common.keyboard import get_start_menu
 
 async def create_user_stats(mess: Message):
 
-    user_data: UserData = await get_user_data(str(mess.from_user.id))
+    user_data: UserData = await db_get_user_data(str(mess.from_user.id))
 
     if not user_data.total:
         await mess.answer(text='Excuse me, You have not any currency!')
@@ -35,6 +35,7 @@ async def create_user_stats(mess: Message):
                                   photo=plot,
                                   caption='\n'.join(user_stats_parts),
                                   reply_markup=get_start_menu())
+        remove_plot_file_from_server(plot.filename)
     else:
         await mess.answer(text='\n'.join(user_stats_parts),
                           reply_markup=get_start_menu())
@@ -136,11 +137,15 @@ def calculate_profit_and_generate_emoji(spended: Decimal, getted: Decimal) -> tu
 
 async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB') -> InputFile:
 
-    plot_file_name = generate_plot(user_data_plt, user_default_cur, mess.from_user.id)
+    plot_file_name = generate_plot(user_data_plt, user_default_cur, mess.from_user.id, title='Spend and received value')
 
     # plot_file_id = await upload_user_plot_to_default_chat_for_file_id(mess, plot_file_name)
 
     return InputFile(plot_file_name)
+
+
+def remove_plot_file_from_server(file_name: str):
+    remove(file_name)
 
 
 async def upload_user_plot_to_default_chat_for_file_id(mess: Message, plot_file_name: str) -> str:
@@ -158,7 +163,7 @@ async def upload_user_plot_to_default_chat_for_file_id(mess: Message, plot_file_
         return user_stats_plot_id
 
 
-def generate_plot(user_data_plt: dict, user_default_cur: str, user_id: int) -> str:
+def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -> str:
     """Generate plot for user stats and return plots file name"""
 
     plt.cla()
@@ -168,10 +173,15 @@ def generate_plot(user_data_plt: dict, user_default_cur: str, user_id: int) -> s
 
     y_pos = np.arange(len(user_data_plt))
 
-    plt.bar(y_pos, list(user_data_plt.values()), align='center', alpha=0.5, color=colors)
+    fig, ax = plt.subplots(1)
+
+    ax.bar(y_pos, list(user_data_plt.values()), align='center', alpha=0.5, color=colors)
+    max_value = max(user_data_plt.values())
+    ax.set_ylim(0, max_value + max_value // 10)
+
     plt.xticks(y_pos, tuple(user_data_plt.keys()), rotation=45)
-    plt.ylabel(user_default_cur)
-    plt.title('Spend and received value')
+    plt.ylabel(y_label)
+    plt.title(title)
 
     add_descriptions_for_plot_bars(plt, user_data_plt)
 
@@ -223,7 +233,7 @@ async def add_data_to_user_stats(user_id: str, summ_val: str, summ_prc: str):
     """Add user stats in DB USER_STATS"""
     if not await checked_user_stat_already_added(user_id):
         return
-    await add_user_stat(user_id, summ_val, summ_prc)
+    await db_add_user_statistics(user_id, summ_val, summ_prc)
 
 
 async def checked_user_stat_already_added(user_id: str) -> bool:

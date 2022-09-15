@@ -8,7 +8,7 @@ def get_start_menu():
         'Statistics',
         'Add',
         'Del',
-        'Clear',
+        'Additional',
         'Settings',
     )
 

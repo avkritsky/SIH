@@ -14,7 +14,7 @@ from model.transaction_data_class import Transaction
 from model.user_data_class import UserData
 
 
-async def create_tables() -> bool:
+async def db_create_tables() -> bool:
     """Create tables for SIH from settings.tables_models"""
     res = await asyncio.gather(
         *[asyncio.create_task(create_table(db_name=table_name, columns=table))
@@ -26,11 +26,11 @@ async def create_tables() -> bool:
     return all_res
 
 
-async def add_user(user_id: str,
-                   user_name: str,
-                   default_value_type: str = 'RUB',
-                   total: str = '{}',
-                   ):
+async def db_add_user(user_id: str,
+                      user_name: str,
+                      default_value_type: str = 'RUB',
+                      total: str = '{}',
+                      ):
     """Add user to user_data"""
     res = await add_data(db_name='user_data',
                          data={
@@ -44,7 +44,7 @@ async def add_user(user_id: str,
         print(f'Успешно создан пользователь {user_name} с ID: {user_id}!')
     return res
 
-async def add_transaction(transaction: Transaction):
+async def db_add_transaction(transaction: Transaction):
     """Add transaction to user_transaction"""
 
     res = await add_data(db_name='user_transaction',
@@ -64,21 +64,21 @@ async def add_transaction(transaction: Transaction):
     return res
 
 
-async def get_user_transaction(user_id: str, selected_page: int = 1):
+async def db_get_user_transaction(user_id: str, selected_page: int = 1):
     res = await get_data(db_name='user_transaction',
                          criterias={'user_id': user_id})
     # TODO: добавить разбивку на чанки по 10 транзакций и выдавать SELECTED_PAGE-транзакцию -1
     return res
 
 
-async def del_user_transaction(user_id: str, trans_id: int):
+async def db_del_user_transaction(user_id: str, trans_id: int):
     res = await del_data(db_name='user_transaction',
                          criterias={'user_id': user_id,
                                     'id': trans_id})
     return res
 
 
-async def update_user_total_info(user_id: str, new_total: dict):
+async def db_update_user_total_info(user_id: str, new_total: dict):
     """Update user total cash after transaction"""
 
     # total = await get_user_total(user_id)
@@ -92,7 +92,7 @@ async def update_user_total_info(user_id: str, new_total: dict):
                       })
 
 
-async def get_user_total(user_id: str) -> dict:
+async def db_get_user_total(user_id: str) -> dict:
     """Return dict with users total data or empty dict on error"""
     user_data = await get_data(db_name='user_data',
                                criterias={'user_id': user_id})
@@ -112,7 +112,7 @@ async def get_user_total(user_id: str) -> dict:
         return {}
 
 
-async def get_user_data(user_id: str) -> Union[bool, UserData]:
+async def db_get_user_data(user_id: str) -> Union[bool, UserData]:
     """Return users data from DB as an instance of a class UserData"""
     raw_user_data = await get_data(db_name='user_data',
                                criterias={'user_id': user_id})
@@ -125,7 +125,7 @@ async def get_user_data(user_id: str) -> Union[bool, UserData]:
     return user_data
 
 
-async def add_user_stat(user_id: str, summ_val: str, summ_prc: str):
+async def db_add_user_statistics(user_id: str, summ_val: str, summ_prc: str):
     res = await add_data(db_name='user_stats',
                          data={
         'user_id': user_id,
@@ -138,6 +138,14 @@ async def add_user_stat(user_id: str, summ_val: str, summ_prc: str):
         print(f'Успешно добавлена статистика пользователя {user_id}!')
 
     return res
+
+
+async def db_get_user_statistics(user_id: str) -> list:
+    """Return users data from DB as an instance of a class UserData"""
+    raw_user_stats = await get_data(db_name='user_stats',
+                                   criterias={'user_id': user_id})
+
+    return raw_user_stats
 
 
 

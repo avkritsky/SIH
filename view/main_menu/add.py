@@ -6,7 +6,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
-from controller.bot_data_work import get_user_data, update_user_total_info, add_transaction
+from controller.bot_data_work import db_get_user_data, db_update_user_total_info, db_add_transaction
 from controller.bot_redis_work import redis_get_currency_short_names, redis_get_crypto_short_names
 from model.user_data_class import UserData
 from model.transaction_data_class import Transaction
@@ -32,7 +32,7 @@ def register_handlers_for_add_menu(dp: Dispatcher):
 async def start_automat_for_add(mess: Message, state: FSMContext):
     await state.set_state(AddMenuAutomat.waiting_fot_spended_currency.state)
 
-    user_data: UserData = await get_user_data(mess.from_user.id)
+    user_data: UserData = await db_get_user_data(mess.from_user.id)
 
     crypto_names = await redis_get_crypto_short_names()
     currency_names = await redis_get_currency_short_names()
@@ -115,7 +115,7 @@ async def automat_for_add_received_value(mess: Message, state: FSMContext):
         user_data.total[received_cur] = str(user_total_for_recei)
 
     await add_new_transaction(mess.from_user.id, spended_cur, spended_cur_val, received_cur, received_cur_val)
-    await update_user_total_info(mess.from_user.id, user_data.total)
+    await db_update_user_total_info(mess.from_user.id, user_data.total)
 
     await mess.answer(f'Вы добавили запись о {received_cur_val} {received_cur} '
                       f'приобретенные за {spended_cur_val} {spended_cur}!'
@@ -131,4 +131,4 @@ async def add_new_transaction(user_id: int, spc: str, spcv: str, rpc: str, rpcv:
     transaction = Transaction().set_user_id(str(user_id)).set_spended_currency(spc).set_spended_count(spcv)
     transaction.set_received_currency(rpc).set_received_count(rpcv)
 
-    await add_transaction(transaction)
+    await db_add_transaction(transaction)

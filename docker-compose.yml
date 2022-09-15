@@ -1,0 +1,12 @@
+version: '3.7'
+
+services:
+  sihe_img:
+    build: .
+    container_name: sihe
+    restart: always
+    volumes:
+      - .:/var/www/html/sihe
+    working_dir: /var/www/html/sihe
+    command: bot_main.py
+    network_mode: host
