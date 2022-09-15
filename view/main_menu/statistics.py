@@ -28,11 +28,11 @@ async def create_user_stats(mess: Message):
     all_getted, all_spended = await calculate_stats(user_data, user_stats_parts, user_data_for_plt)
     await add_summary_data_to_stats(user_data, all_getted, all_spended, user_stats_parts, user_data_for_plt)
 
-    plot_id = await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
+    plot = await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
 
-    if plot_id:
+    if plot.filename:
         await mess.bot.send_photo(mess.from_user.id,
-                                  photo=plot_id,
+                                  photo=plot,
                                   caption='\n'.join(user_stats_parts),
                                   reply_markup=get_start_menu())
     else:
@@ -134,13 +134,13 @@ def calculate_profit_and_generate_emoji(spended: Decimal, getted: Decimal) -> tu
 
 
 
-async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB') -> str:
+async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB') -> InputFile:
 
     plot_file_name = generate_plot(user_data_plt, user_default_cur, mess.from_user.id)
 
-    plot_file_id = await upload_user_plot_to_default_chat_for_file_id(mess, plot_file_name)
+    # plot_file_id = await upload_user_plot_to_default_chat_for_file_id(mess, plot_file_name)
 
-    return plot_file_id
+    return InputFile(plot_file_name)
 
 
 async def upload_user_plot_to_default_chat_for_file_id(mess: Message, plot_file_name: str) -> str:
