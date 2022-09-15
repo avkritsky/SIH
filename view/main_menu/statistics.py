@@ -30,12 +30,14 @@ async def create_user_stats(mess: Message):
 
     plot = await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
 
-    if plot.filename:
+    if plot:
+        plot_file = InputFile(plot)
         await mess.bot.send_photo(mess.from_user.id,
-                                  photo=plot,
+                                  photo=plot_file,
                                   caption='\n'.join(user_stats_parts),
                                   reply_markup=get_start_menu())
-        remove_plot_file_from_server(plot.filename)
+
+        remove_plot_file_from_server(plot)
     else:
         await mess.answer(text='\n'.join(user_stats_parts),
                           reply_markup=get_start_menu())
@@ -135,13 +137,13 @@ def calculate_profit_and_generate_emoji(spended: Decimal, getted: Decimal) -> tu
 
 
 
-async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB') -> InputFile:
+async def create_and_upload_plot_stat(mess: Message, user_data_plt: dict, user_default_cur: str = 'RUB') -> str:
 
     plot_file_name = generate_plot(user_data_plt, user_default_cur, mess.from_user.id, title='Spend and received value')
 
     # plot_file_id = await upload_user_plot_to_default_chat_for_file_id(mess, plot_file_name)
 
-    return InputFile(plot_file_name)
+    return plot_file_name
 
 
 def remove_plot_file_from_server(file_name: str):
