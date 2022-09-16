@@ -2,11 +2,11 @@ version: '3.7'
 
 services:
   sihe_img:
-    build: .
+    image: python:3.10-slim-bullseye
     container_name: sihe
     restart: always
     volumes:
       - .:/var/www/html/sihe
     working_dir: /var/www/html/sihe
-    command: bot_main.py
+    command: bash start.sh
     network_mode: host
