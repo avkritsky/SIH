@@ -183,7 +183,7 @@ def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -
 
     plt.xticks(y_pos, tuple(user_data_plt.keys()), rotation=45)
     plt.ylabel(y_label)
-    plt.title(title)
+    plt.title(f'{title} at {datetime.now().replace(microsecond=0)}')
 
     add_descriptions_for_plot_bars(plt, user_data_plt)
 
@@ -233,8 +233,8 @@ def add_descriptions_for_plot_bars(plt, user_data_plt: dict):
 
 async def add_data_to_user_stats(user_id: str, summ_val: str, summ_prc: str):
     """Add user stats in DB USER_STATS"""
-    if not await checked_user_stat_already_added(user_id):
-        return
+    # if not await checked_user_stat_already_added(user_id):
+    #     return
     await db_add_user_statistics(user_id, summ_val, summ_prc)
 
 
