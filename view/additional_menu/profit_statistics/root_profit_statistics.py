@@ -61,28 +61,14 @@ def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -
     plt.cla()
     plt.clf()
 
-    values = list(user_data_plt.values())
+    # values = list(user_data_plt.values())
 
     y_pos = np.arange(len(user_data_plt))
 
-    fig, ax = plt.subplots(1)
+    _, ax = plt.subplots(1)
 
     max_vals = [item.get('max') for item in user_data_plt.values()]
     min_vals = [item.get('min') for item in user_data_plt.values()]
-
-    # max_vals = []
-    # for item in user_data_plt.values():
-    #     val = item.get('max')
-    #     if val < 0:
-    #         val = item.get('min')
-    #     max_vals.append(val)
-    #
-    # min_vals = []
-    # for item in user_data_plt.values():
-    #     val = item.get('min')
-    #     if val < 0:
-    #         val = item.get('max')
-    #     min_vals.append(val)
 
     height_vals = [
         abs(abs(max_val) - abs(min_val))
@@ -90,15 +76,6 @@ def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -
         else (Decimal('0.5') if max_val < 0 else Decimal('-0.5'))
         for item in user_data_plt.values()
     ]
-
-    # height_vals = [height_val
-    #                if abs(height_val) >= Decimal('0.2')
-    #                else (Decimal('0.2') if height_val < 0 else Decimal('-0.2'))
-    #                for height_val in height_vals]
-
-    print(f'{height_vals}')
-
-    print(f'{max_vals=}\n{min_vals=}')
 
     ax.bar(y_pos,
            height=height_vals,
@@ -120,10 +97,20 @@ def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -
 
     add_descriptions_for_plot_bars(plt, user_data_plt)
 
+    add_line_for_last_stat_values(plt, ax, y_pos, user_data_plt)
+
     name_plot_file = generate_plot_name(user_id)
     plt.savefig(name_plot_file)
 
     return name_plot_file
+
+
+def add_line_for_last_stat_values(plt, ax, y_pos: np.ndarray, user_data_plt: dict):
+    lasts_value = [dayly_stat.get('vals', [])[-1] for dayly_stat in user_data_plt.values()]
+
+    ax.plot(y_pos, lasts_value, c='purple')
+    plt.scatter(y_pos, lasts_value, c='purple')
+
 
 
 def create_colors_for_max_values(values: list) -> list:
