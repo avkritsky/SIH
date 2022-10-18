@@ -17,7 +17,7 @@ async def show_profit_statistics(mess: Message):
 
     stats = format_data_for_plot(raw_stats)
 
-    plot = generate_plot(stats, 'Perc., %', mess.from_user.id, title='Profit statistic')
+    plot = generate_weekly_profit_stats_plot(stats, 'Perc., %', mess.from_user.id, title='Profit statistic')
 
     await send_plot_to_user_and_del_file(mess, plot)
 
@@ -36,8 +36,11 @@ async def send_plot_to_user_and_del_file(mess: Message, plot: str):
 
 
 def format_data_for_plot(raw_data: list) -> dict:
+    """Format user's stats data from DB to plot's data, search daily max and min"""
+
     stats = {}
     all_stats = {}
+
     for item in raw_data:
         _, _, date_ts, _, profit_perc = item
         if datetime.timestamp(datetime.now()) - date_ts > 7*24*60*60:
@@ -51,25 +54,28 @@ def format_data_for_plot(raw_data: list) -> dict:
         stats_item['vals'].append(profit_perc)
         stats_item['max'] = max(stats_item['vals'])
         stats_item['min'] = min(stats_item['vals'])
+
     return all_stats
 
 
 
-def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -> str:
+def generate_weekly_profit_stats_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -> str:
     """Generate plot for user stats and return plots file name"""
 
+    # clear plot
     plt.cla()
     plt.clf()
 
-    # values = list(user_data_plt.values())
-
-    y_pos = np.arange(len(user_data_plt))
+    # create X positions for bars
+    x_pos = np.arange(len(user_data_plt))
 
     _, ax = plt.subplots(1)
 
+    # create daily min and max lists
     max_vals = [item.get('max') for item in user_data_plt.values()]
     min_vals = [item.get('min') for item in user_data_plt.values()]
 
+    # calculate height bars list
     height_vals = [
         abs(abs(max_val) - abs(min_val))
         if (max_val:=item.get('max')) != (min_val:=item.get('min'))
@@ -77,55 +83,69 @@ def generate_plot(user_data_plt: dict, y_label: str, user_id: int, title: str) -
         for item in user_data_plt.values()
     ]
 
-    ax.bar(y_pos,
+    # draw bars
+    ax.bar(x_pos,
            height=height_vals,
            bottom=min_vals,
            align='center',
            alpha=0.5,
-           color=create_colors_for_max_values(max_vals))
+           color=create_colors_for_max_values(max_vals, min_vals))
 
-    max_value = max(max_vals) + 2
-    min_value = (min_value if (min_value := min(min_vals)) < 0 else 0) - 2
-    ax.set_ylim(min_value, max_value)
+    # set low and high limit for Y values
+    high_limit = max(max_vals) + 2
+    low_limit = (low_limit if (low_limit := min(min_vals)) < 0 else 0) - 2
+    ax.set_ylim(low_limit, high_limit)
 
-    if min_value < 0:
+    # draw zero-line if low_limit < 0
+    if low_limit < 0:
         ax.axhline(0, color="black", ls="--")
 
-    plt.xticks(y_pos, tuple(user_data_plt.keys()), rotation=25)
+    # draw labels for bars
+    plt.xticks(x_pos, tuple(user_data_plt.keys()), rotation=25)
+
+    # draw Y label
     plt.ylabel(y_label)
+
+    # draw plot's title
     plt.title(f'{title} from {datetime.now().date()-timedelta(days=6)} to {datetime.now().date()}')
 
+    # draw bar's min and max values
     add_descriptions_for_plot_bars(plt, user_data_plt)
 
-    add_line_for_last_stat_values(plt, ax, y_pos, user_data_plt)
+    # draw line for lats daily values (like trend, but not)
+    add_line_for_last_stat_values(plt, ax, x_pos, user_data_plt)
 
+    # generate plot's filename
     name_plot_file = generate_plot_name(user_id)
+
+    # save plot in file
     plt.savefig(name_plot_file)
 
     return name_plot_file
 
 
 def add_line_for_last_stat_values(plt, ax, y_pos: np.ndarray, user_data_plt: dict):
+    """Draw line for lats daily values (like trend, but not)"""
     lasts_value = [dayly_stat.get('vals', [])[-1] for dayly_stat in user_data_plt.values()]
 
     ax.plot(y_pos, lasts_value, c='purple')
     plt.scatter(y_pos, lasts_value, c='purple')
 
 
-
-def create_colors_for_max_values(values: list) -> list:
+def create_colors_for_max_values(values: list, min_values: list) -> list:
+    """Generate colors for bars by min and max values of daily profit's stat"""
     maximus = max(values)
-    minimus = min(values)
+    minimus = min(min_values)
 
     colors = []
 
-    for val in values:
-        if minimus < val < maximus:
-            colors.append('blue')
-        elif val == maximus:
+    for val, min_val in zip(values, min_values):
+        if val == maximus:
             colors.append('green')
-        else:
+        elif min_val == minimus:
             colors.append('red')
+        else:
+            colors.append('blue')
 
     return colors
 
