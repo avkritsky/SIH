@@ -71,7 +71,8 @@ async def calculate_stats(user_data: UserData,
     all_getted = Decimal(0)
 
     for valute_name, valute_val in user_data.total.items():
-        if ':' in valute_name:
+
+        if ':' in valute_name or valute_val == '0':
             continue
 
         getted = Decimal(0)
