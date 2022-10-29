@@ -21,9 +21,9 @@ Simple Investing Helper [В разработке]
 
 ![image](https://user-images.githubusercontent.com/95647455/190491169-d6956e56-829c-4da1-bddc-3a03b7cae1d1.png)
 
-Пример статистики прибыльности вложений (записывается раз в день при обращении к общей статистике):
+Пример статистики прибыльности вложений:
 
-![image](https://user-images.githubusercontent.com/95647455/190491341-02150f67-9ad5-48bf-b7bd-69c83d8641bf.png)
+![main_stat](https://user-images.githubusercontent.com/95647455/198828124-1e761e18-a2f4-403d-b6b1-701435cc9824.png)
 
 Удаление транзакции:
 
