@@ -14,9 +14,9 @@ from settings.api_key import TEMP_PLOT_CHAT
 from view.common.keyboard import get_start_menu
 
 
-async def create_user_stats(mess: Message):
+async def create_user_stats(mess: Message = None, plot_needed: bool = True, user_id: str = ''):
 
-    user_data: UserData = await db_get_user_data(str(mess.from_user.id))
+    user_data: UserData = await db_get_user_data(str(mess.from_user.id) if mess is not None else user_id)
 
     if not user_data.total:
         await mess.answer(text='Excuse me, You have not any currency!')
@@ -27,6 +27,9 @@ async def create_user_stats(mess: Message):
 
     all_getted, all_spended = await calculate_stats(user_data, user_stats_parts, user_data_for_plt)
     await add_summary_data_to_stats(user_data, all_getted, all_spended, user_stats_parts, user_data_for_plt)
+
+    if not plot_needed:
+        return True
 
     plot = await create_and_upload_plot_stat(mess, user_data_for_plt, user_data.default_value)
 

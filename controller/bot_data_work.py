@@ -30,6 +30,7 @@ async def db_add_user(user_id: str,
                       user_name: str,
                       default_value_type: str = 'RUB',
                       total: str = '{}',
+                      settings: str = '{}',
                       ):
     """Add user to user_data"""
     res = await add_data(db_name='user_data',
@@ -38,6 +39,7 @@ async def db_add_user(user_id: str,
                              'user_name': user_name,
                              'default_value_type': default_value_type,
                              'total': total,
+                             'settings': settings,
                          })
 
     if res:
@@ -86,6 +88,18 @@ async def db_update_user_total_info(user_id: str, new_total: dict):
     await update_data(db_name='user_data',
                       data={
                           'total': json.dumps(new_total),
+                      },
+                      criterias={
+                           'user_id': user_id,
+                      })
+
+
+async def db_update_user_settings(user_id: str, new_settings: dict):
+    """Update user's settings"""
+
+    await update_data(db_name='user_data',
+                      data={
+                          'settings': json.dumps(new_settings),
                       },
                       criterias={
                            'user_id': user_id,

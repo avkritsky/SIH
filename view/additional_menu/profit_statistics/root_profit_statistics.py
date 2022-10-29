@@ -77,7 +77,7 @@ def generate_weekly_profit_stats_plot(user_data_plt: dict, y_label: str, user_id
 
     # calculate height bars list
     height_vals = [
-        abs((max_val) - (min_val))
+        abs(max_val - min_val)
         if (max_val:=item.get('max')) != (min_val:=item.get('min'))
         else (Decimal('0.5') if max_val < 0 else Decimal('-0.5'))
         for item in user_data_plt.values()

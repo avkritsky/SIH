@@ -10,3 +10,12 @@ services:
     working_dir: /var/www/html/sihe
     command: bash start.sh
     network_mode: host
+  taskiq_img:
+    image: python:3.10-slim-bullseye
+    container_name: taskiq
+    restart: always
+    volumes:
+      - .:/var/www/html/sihe
+    working_dir: /var/www/html/sihe
+    command: bash start_scheduler.sh
+    network_mode: host

@@ -4,6 +4,7 @@ user_table = {
     'user_name': 'TEXT NOT NULL',
     'default_value_type': 'TEXT',
     'total': 'TEXT',
+    'settings': 'TEXT',
 }
 
 user_transaction = {
